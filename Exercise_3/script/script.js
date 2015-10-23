@@ -28,16 +28,16 @@ var axisY = d3.svg.axis()
 
 
 
-queue()
-    .defer(d3.csv,'data/world_bank_1995_gdp_co2.csv',parse)
+queue()//load multiple datasets at once, return single callback
+    .defer(d3.csv,'data/world_bank_1995_gdp_co2.csv',parse) //defer however long it takes
     .defer(d3.csv,'data/world_bank_2010_gdp_co2.csv',parse)
-    .await(function(err,data1995,data2010){
+    .await(function(err,data1995,data2010){ //then run the await function when everything has completed.
 
         scaleX.domain( d3.extent(data1995, function(d){
             return d.gdpPerCap; })
         );
         scaleY.domain( d3.extent(data1995, function(d){ return d.co2PerCap; }));
-        scaleR.domain( d3.extent(data1995, function(d){ return d.co2Total; }));
+        scaleR.domain( d3.extent(data1995, function(d){ return d.co2Total; })); //scale radius of circle to match quantity of data, using a square root dependence
 
         //Draw axes
         plot.append('g')
@@ -51,13 +51,67 @@ queue()
         console.log(data1995);
         console.log(data2010);
 
+        d3.selectAll('.btn').on('click', function() {
 
-
+            var year = d3.select(this).attr('id');
+            if (year == 'year-1995') {
+                draw(data1995);
+            }
+            else {
+                draw(data2010);
+            }
+        })
     });
 
 function draw(data){
 
+    //select all with key function
+    var nodes = plot.selectAll('.country')
+        .data(data, function(d){return d.cCode;});
 
+    //Enter set
+    //var nodesEnter = nodes.enter();  //enter set, empty placeholders
+     var nodesEnter= nodes.enter().append('g')
+        .attr('class', 'country')
+        .attr('transform', function(d) { //if this isn't here, everything will start from origin and fly in on transition. To show in place, place in right place to begin with
+            return 'translate(' + scaleX(d.gdpPerCap) + ',' +scaleY(d.co2PerCap) + ')';
+        })
+        .style('fill', 'rgba(80,80,80,.1)')
+        .style('stroke', 'rgb(50,50,50)')
+    //add event listener here so that it shows up once per click
+         .on('click', function(d){
+
+             nodes.selectAll('circle').style('stroke', 'rgb(80,80,80'); //sets prev. highlighted circle back to gray when a new one is clicked.
+             console.log(d);
+             d3.select(this).select('circle')
+                 .style('stroke', 'red');
+         });
+
+    nodesEnter.append('circle')
+        .attr('r', function(d){return scaleR(d.co2Total);
+        });
+    nodesEnter.append('text')
+        .text(function(d){
+            return d.cCode;
+        })
+        .attr('text-anchor', 'middle')
+        .attr('font-size','8px')
+        .attr('fill', 'rgb(80,80,80)');
+
+
+    //Exit set
+    nodes.exit().remove();
+
+    //Update set
+    //update 'transform' attribute
+    nodes
+        .transition()
+        .attr("transform", function(d) {return 'translate(' + scaleX(d.gdpPerCap) + ',' +scaleY(d.co2PerCap) + ')'})
+        .select('circle')  //already exists, so don't need to append new circles to update set.
+        .attr('r', function(d){ return scaleR(d.co2Total);
+        });
+
+    //fill and stroke should be set in the enter set b/c constant attribute. If it changes over lifetime of vis, then put in update
 }
 
 function parse(row){
